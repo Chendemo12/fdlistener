@@ -1,0 +1,27 @@
+version: '3.7'
+services:
+  fdlistener:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fdlistener
+
+    environment:
+      - DEBUG=1
+      - PUSHER_ADDRESS=${PUSHER_ADDRESS}
+      - SUB_HOST=${SUB_HOST}
+      - SUB_PORT=${SUB_PORT}
+      - SUB_ACCESS_KEY=${SUB_ACCESS_KEY}
+      - SUB_ACCESS_SECRET=${SUB_ACCESS_SECRET}
+      - SUB_ID=${SUB_ID}
+
+    env_file:
+      - .env
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m" # 限制每个日志文件大小
+        max-file: "7" # 保留最近日志文件天数
+
+    restart: always
