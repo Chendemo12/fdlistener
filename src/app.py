@@ -4,14 +4,16 @@ import asyncio
 import concurrent.futures
 import inspect
 import logging
+import os
 from asyncio import Queue
 from pathlib import Path
 from typing import Optional, Callable, Any
 from urllib.parse import urlparse, ParseResult
 
 from loguru import logger
-
 from src.pusher import HttpClient
+
+PROJECT_PATH: Path = Path(__file__).resolve().parent.parent
 
 
 class Application(object):
@@ -22,15 +24,11 @@ class Application(object):
             cls._instance = object.__new__(cls)
         return cls._instance
 
-    def __init__(
-            self,
-            remote_address: str,
-            project_dir: Path = ""
-    ):
+    def __init__(self, remote_address: str):
         self._stop: bool = False
         self.executor: concurrent.futures.Executor = concurrent.futures.ThreadPoolExecutor()
         self.remote_address: ParseResult = urlparse(remote_address)
-        self.project_dir: Path = project_dir
+        self.project_dir: Path = PROJECT_PATH
         self.sub_queue: Optional[Queue] = None
 
         self.pusher: HttpClient = HttpClient(
@@ -107,3 +105,34 @@ class LoguruHandler(logging.Handler):
 
 class AccessHandler(LoguruHandler):
     _logger = logger.bind(name="access")
+
+
+def logger_startup() -> None:
+    _debug: bool = os.environ.get("DEBUG", False)
+    logger.add(
+        os.path.join(os.environ.get("FDLISTENER_LOG_DIR", PROJECT_PATH), f"logs/{PROJECT_PATH.name}.log"),
+        level="DEBUG" if _debug else "WARNING",
+        rotation="5 MB",
+        retention="7 days",
+        compression="tar.gz"
+    )
+
+    # 将默认的logging替换成loguru
+    logging.captureWarnings(True)
+    logging.root.handlers = [LoguruHandler()]
+
+    for name in logging.root.manager.loggerDict.keys():
+        logger_ = logging.getLogger(name)
+
+        if name.startswith("http"):
+            logger_.handlers = [AccessHandler()] if _debug else []  # 禁用HTTP日志，调试时可以打开
+
+        elif name in ("asyncio", "concurrent"):
+            logger_.handlers = [LoguruHandler()]
+        elif name in ("websocket",):
+            logger_.handlers = [AccessHandler()]
+
+        else:
+            logger_.handlers = []
+
+        logger_.propagate = False

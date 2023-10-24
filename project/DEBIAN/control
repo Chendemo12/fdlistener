@@ -1,0 +1,9 @@
+Package: fdlistener
+Version: 0.0.1
+Architecture: arm64
+Section: utils
+Priority: optional
+Maintainer: apps.com
+Contact: apps.com
+Description: fdlistener app.
+

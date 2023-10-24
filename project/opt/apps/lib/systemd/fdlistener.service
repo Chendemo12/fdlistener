@@ -1,0 +1,17 @@
+[Unit]
+Description=fdlistener
+After=network.target
+#Requires=xxx.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+Restart=always
+RestartSec=5s
+ExecStart=/opt/apps/fdlistener/main.py
+ExecReload=/opt/apps/fdlistener/main.py
+
+[Install]
+WantedBy=multi-user.target
+
