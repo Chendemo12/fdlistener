@@ -1,0 +1,19 @@
+[
+  {
+    "path": "/opt/projects/fdlistener/logs",
+    "kind": "dir",
+    "on": [
+      "fileCreated",
+      "fileDeleted",
+      "fileMoved",
+      "fileOpened",
+      "fileClosed",
+      "dirCreated",
+      "dirMoved",
+      "dirDeleted"
+    ],
+    "recursive": true,
+    "excluded_extensions": [],
+    "cmd": "echo "
+  }
+]

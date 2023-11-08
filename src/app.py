@@ -12,6 +12,7 @@ from urllib.parse import urlparse, ParseResult
 
 from loguru import logger
 from src.pusher import HttpClient
+from src.watcher import Config, ConfigReader, Watcher
 
 PROJECT_PATH: Path = Path(__file__).resolve().parent.parent
 
@@ -30,20 +31,60 @@ class Application(object):
         self.remote_address: ParseResult = urlparse(remote_address)
         self.project_dir: Path = PROJECT_PATH
         self.sub_queue: Optional[Queue] = None
+        self.config: Config = Config(conrainers=[])
+        self._watchers: list[Watcher] = []
 
         self.pusher: HttpClient = HttpClient(
             self.remote_address.netloc,
             tsl=self.remote_address.scheme == "https"
         )
 
+    def _init_watchers(self):
+        for container in self.config.containers:
+            watcher = Watcher(container)
+            self._watchers.append(watcher)
+
+        for watcher in self._watchers:
+            watcher.start()
+            logger.info(f"watcher stated: ({watcher})")
+
     def stop(self):
         self._stop = True
+        self.executor.shutdown()
 
-    async def run(self):
+    async def _do(self, data):
+        logger.info(f"{data}")
+
+    async def consume(self):
+        while not self._stop:
+            try:
+                data = await self.sub_queue.get()
+                await self._do(data)
+
+            except (KeyboardInterrupt, asyncio.exceptions.CancelledError):
+                return
+
+            except Exception as e:
+                logger.exception(e)
+
+    async def run(self, config_filepath: str):
         self._stop = False
         self.sub_queue = Queue()
+        if not os.path.exists(config_filepath):
+            raise FileNotFoundError(f"{config_filepath!r}")
+
+        if config_filepath.endswith(".json"):
+            self.config = ConfigReader.load_json_config(config_filepath)
+        elif config_filepath.endswith(".toml"):
+            self.config = ConfigReader.load_toml_config(config_filepath)
+        else:
+            raise TypeError("unsupported file type")
+
+        self._init_watchers()
 
         logger.info("application started!")
+
+        await self.consume()
 
     async def run_sync_func(self, func: Callable, timeout: int = 0, on_timeout: Callable = None) -> Any:
         """
@@ -81,7 +122,7 @@ class Application(object):
             future.cancel()  # 如果超时，取消 Future 对象
 
     def __del__(self):
-        self.executor.shutdown()
+        self.stop()
 
 
 class LoguruHandler(logging.Handler):
